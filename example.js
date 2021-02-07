@@ -21,8 +21,4 @@ nymea.on("connected", function() {
     });
 })
 
-nymea.on("replyReceived", function(commandId, command, reply) {
-    console.log("Reply received:", commandId)
-});
-
 nymea.connect();
