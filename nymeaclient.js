@@ -33,8 +33,8 @@ sendCommand(method, params) {
 
 connect() {
     var option = {
-        host:'localhost',
-        port: 2222
+        host: this.address,
+        port: this.port
     }
 
     console.log("Connecting to nymea on " + option.host + ":" + option.port) 
