@@ -16,13 +16,22 @@ nymea.on("connected", function() {
         for (let i = 0; i < reply.thingClasses.length; i++) {
             let thingClass = reply.thingClasses[i]
             // Convert stateTypes from a list to a map for easier lookup
-            let stateTypes = {}
+            let stateTypes = {};
             for (let j = 0; j < thingClass.stateTypes.length; j++) {
-                let stateType = thingClass.stateTypes[j]
+                let stateType = thingClass.stateTypes[j];
                 stateTypes[stateType.id] = stateType;
             }
             thingClass.stateTypes = stateTypes;
-            // TODO: same for eventTypes and actionTypes
+
+            // Convert actionTyes from a list to a map or easier lookup
+            let actionTypes = {};
+            for (let j = 0; j < thingClass.actionTypes.length; j++) {
+                let actionType = thingClass.actionTypes[j];
+                actionTypes[actionType.id] = actionType;
+            }
+            thingClass.actionTypes = actionTypes;
+
+            // TODO: same for eventTypes
 
             thingClasses[thingClass.id] = thingClass
         }
@@ -47,6 +56,9 @@ nymea.on("connected", function() {
             thing["states"] = states;
         }
         console.log("Total thing count:", reply.things.length)
+
+        // Turning on all lights as an example
+        turnOnAllLights();
     });
 
     let integrationsNotifications = nymea.registerNotificationHandler("Integrations");
@@ -83,3 +95,51 @@ nymea.on("authenticationRequired", function() {
 
 
 nymea.connect();
+
+function turnOnAllLights() {
+    console.log("Turning on all lights");
+    // Iterating over all things to find light devices
+    for (thingId in things) {
+        let thing = things[thingId];
+        let thingClass = thingClasses[thing.thingClassId];
+        // Check if the thingClass implements the "light" interface
+        // See interface doc: https://nymea.io/documentation/developers/integrations/interfaces
+        if (thingClass.interfaces.includes("light")) {
+            console.log("Found light:", thing.name)
+            
+            // Find power action type id. Given the thingClass implements the "light" interface, we can be sure there is a power action
+            let powerActionTypeId
+            for (actionTypeId in thingClass.actionTypes) {
+                if (thingClass.actionTypes[actionTypeId].name == "power") {
+                    powerActionTypeId = actionTypeId;
+                    break;
+                }
+            }
+            
+            // Compose action parameters.
+            // For state change actions that only have one parameter, the paramTypeId will be the same as the actionTypeId.
+            // This might not be the case for actions with multiple parameters (e.g. notify has title and body params)
+            // In such a case, the correct paramTypeIds need to be obtained from the paramTypes in the actionType
+            let powerOnParam = {}
+            powerOnParam["paramTypeId"] = powerActionTypeId;
+            powerOnParam["value"] = true;
+            
+            // Compose the command parameters for Integrations.ExecuteAction
+            let params = {};
+            params["thingId"] = thing.id;
+            params["actionTypeId"] = powerActionTypeId;
+            params["params"] = [];
+            params.params.push(powerOnParam);
+            
+            console.log("Sending power on action to", thing.name)
+            let powerOnAction = nymea.sendCommand("Integrations.ExecuteAction", params)
+            powerOnAction.on("finished", function(reply) {
+                if (reply.thingError == "ThingErrorNoError") {
+                    console.log("Power on action finished successfully");
+                } else {
+                    console.warn("Power on action failed:", reply.thingError, reply.displayMessage);
+                }
+            });
+        }
+    } 
+}
